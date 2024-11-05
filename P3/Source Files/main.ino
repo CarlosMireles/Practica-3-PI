@@ -208,8 +208,6 @@ void loop() {
 	 }
 
 	switch (modo){
-		  case 0:
-				break;
 		  case 1:
 				mostrarOpcion("Guardar un byte en memoria");
 				Dir = obtenerDireccion("Por favor introduzca una dirección válida (0-8191)", 8191);
@@ -272,23 +270,21 @@ void loop() {
 }
   
   
-void escribir1Byte(long dir, long dato, boolean mostrar){
+void escribir1Byte(int dir, byte dato, boolean mostrar){
 		start:
 			i2c_start();
 	    
-			i2c_esc_byte(0xA0); // chip 0 y seleccionamos escritura
-			if (i2c_Rbit() != 0) goto start; // si ACK devuelve 1 nadie respondio entncs al start otra vez
+			i2c_esc_byte(0xA0); 			// chip 0 y seleccionamos escritura
+			if (i2c_Rbit() != 0) goto start; 	// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
 	    
-			// Mandar la direccion en la que se va a escribir
-			i2c_esc_byte(dir >> 8); // te quedas con los mas significativos y se mandan para el bus
-			if (i2c_Rbit() != 0) goto start; // si ACK devuelve 1 nadie respondio entncs al start otra vez
+			i2c_esc_byte(dir >> 8); 		// Se envian los 8 bits más significativos bits de la dirección
+			if (i2c_Rbit() != 0) goto start; 	// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
 	    
-			i2c_esc_byte(dir & 0xFF); // te quedas con los menos significativos y se mandan para el bus
-			if (i2c_Rbit() != 0) goto start; // si ACK devuelve 1 nadie respondio entncs al start otra vez
+			i2c_esc_byte(dir & 0xFF); 		// Se envian los 8 bits menos significativos bits de la dirección
+			if (i2c_Rbit() != 0) goto start; 	// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
 	    
-			// Dato a escribir
-			i2c_esc_byte(dato);
-			if (i2c_Rbit() != 0) goto start; // si ACK devuelve 1 nadie respondio entncs al start otra vez
+			i2c_esc_byte(dato);			// Se escribe el dato en la dirección 
+			if (i2c_Rbit() != 0) goto start; 	// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
 	    
 			i2c_stop();
 			
