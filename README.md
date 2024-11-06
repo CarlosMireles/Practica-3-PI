@@ -13,6 +13,7 @@ Manejo de una memoria(24LC64) compatible con el bus i2c. Se hará uso de de un m
 4. Mostrar el contenido de un bloque de 256 bytes contiguos
 5. Inicializar **usando Page Write** un bloque de 256 bytes contiguos
 6. Mostrar el contenido de un bloque de 256 **empleando Secuencial Read**
+7. Cambiar el banco de memoria
 
 #### Aclaraciones
 *PAGE WRITE*: Este método de escritura se basa en lo siguiente, para empezar el maestro envía el byte de control indicando que se va a escribir al esclavo, luego se envía la dirección; parte alta (1 byte) y la parte
