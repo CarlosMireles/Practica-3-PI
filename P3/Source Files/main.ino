@@ -1,19 +1,6 @@
-/* Práctica 3: Implementación y uso del protocolo I2C
- * 
- * Descripción: Aplicación correspondiente a la práctica 3 (I2C)
- *
- *
- * Fichero: 	23-24_lab3_base.pdsprj
- * Creado: 		--/10/2022/
- * Autor:		
-*/
-// Programa de demostración
-// Programa para hacer declaración básica
-// y enviar un mensaje a la consola
 #include "Inc_I2C.h"
 #include "I2C_DeclaraFunNaive.h"
 
-// manteniendo lo de la P2 ... 
 
 // Definición para pulsadores
 // PORTC: PC[7:0] --> PINES 30-31-32-33-34-35-36-37
@@ -46,6 +33,7 @@ int tabla_7seg[] = {63,06,91,79,102,109,125,39,127,103,0x77,0x7C, 0x39, 0x5E, 0x
 int lectura;
 int modo=0;
 
+long chip = 1;
 long Dir = 0;
 long Dato = 0;
 
@@ -109,9 +97,9 @@ void mostrarMenu(){
 		Serial.println("OPCIÓN 4 - Mostrar el contenido de un bloque de memoria comenzando en una dirección específica");
 		Serial.println("OPCIÓN 5 - Inicializar un bloque de memoria (256 bytes) a un cierto valor (0-255) utilizando 'Page Write'");
 		Serial.println("OPCIÓN 6 - Mostrar el contenido de un bloque de memoria comenzando en una dirección específica utilizando 'Secuencial Read'");
-		Serial.println("OPCIÓN 7 - Mostrar Menú");
-		Serial.println("");
-		Serial.println("");
+		Serial.println("OPCIÓN 7 - Cambiar chip de memoria");
+		Serial.println("OPCIÓN 8 - Mostrar Menú");
+		Serial.println("-----------------------------------------------------------------");
 }
 
 // Funcion que muestra la opción seleccionada por pantalla
@@ -157,6 +145,25 @@ long obtenerDato(String s, int n){
 		return dato;
 }
 
+
+// Función para obtener la selección del chip de memoria
+long seleccionarBancoMemoria(String s){
+		Serial.println(s);
+		delay(1000);
+		long numero = Serial.parseInt();
+		Serial.println("Chip de memoria seleccionado: " + String(numero));
+		while (numero > 3 | numero < 1) {
+			Serial.println(s);
+			delay(1000);
+			numero = Serial.parseInt();
+			Serial.println("Chip de memoria seleccionado: " + String(numero));
+			delay(1000);
+		}
+		Serial.println("");
+		return numero;
+}
+
+
 // Devuelve una string para imprimir un numero hexadecimal en el formato:  0x00
 String convertirAHexadecimal(long valor){
 		if (valor < 10 ){
@@ -193,7 +200,7 @@ long direccionCompatible(long direccionAComprobar){
 		long direccion = direccionAComprobar;
 		while (direccion % 32 != 0){
 				Serial.println("Introduzca una dirección múltiplo de 32. Ejemplo: 32, 64, 96, 128....");
-				delay(1500);
+				delay(2500);
 				direccion = Serial.parseInt();
 				Serial.println("Dirección: "  + String(direccion));
 		}
@@ -261,72 +268,82 @@ void loop() {
 				Serial.println("Tiempo total = " + String(time) + " milisegundos");
 				Serial.println("");
 				break;
-		  case 7:
+			case 7:
+				mostrarOpcion("Cambiar chip de memoria");
+				chip = seleccionarBancoMemoria("Introduzca 1 para seleccionar el primer chip(000) o 2 para seleccionar el segundo chip(100)");
+				break;
+			case 8:
 				mostrarMenu();
 				modo = 0;
 				break;
-
 	}
 }
   
-  
+
+// Función para escribir un byte en memoria  
 void escribir1Byte(int dir, byte dato, boolean mostrar){
 		start:
 			i2c_start();
 	    
-			i2c_esc_byte(0xA0); 			// chip 0 y seleccionamos escritura
-			if (i2c_Rbit() != 0) goto start; 	// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
+			if (chip == 2){i2c_write_byte(0xA8);}  	// Se indica el chip a utilizar y modo escritura 
+			else {i2c_write_byte(0xA0);} 				
+			
+			if (i2c_Rbit() != 0) goto start;		 		// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
+			
+
+			i2c_write_byte(dir >> 8); 					// Se envian los 8 bits más significativos bits de la dirección
+			if (i2c_Rbit() != 0) goto start; 				// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
 	    
-			i2c_esc_byte(dir >> 8); 		// Se envian los 8 bits más significativos bits de la dirección
-			if (i2c_Rbit() != 0) goto start; 	// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
+			i2c_write_byte(dir & 0xFF); 				// Se envian los 8 bits menos significativos bits de la dirección
+			if (i2c_Rbit() != 0) goto start; 				// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
 	    
-			i2c_esc_byte(dir & 0xFF); 		// Se envian los 8 bits menos significativos bits de la dirección
-			if (i2c_Rbit() != 0) goto start; 	// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
-	    
-			i2c_esc_byte(dato);			// Se escribe el dato en la dirección 
-			if (i2c_Rbit() != 0) goto start; 	// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
+			i2c_write_byte(dato);							// Se escribe el dato en la dirección 
+			if (i2c_Rbit() != 0) goto start; 				// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
 	    
 			i2c_stop();
 			
 			if (mostrar){
-					Serial.println("Se ha escrito el dato " + String(dato) + " (HEX: "  + convertirAHexadecimal(dato) + ")" + " en la posición de memoria: " + String(dir));
+					Serial.println("Se ha escrito el dato " + String(dato) + " (HEX: "  + convertirAHexadecimal(dato) + ")" + " en la posición de memoria: " + String(dir)+ " (HEX: "  + convertirAHexadecimal(dir) + ")" + " [Chip: " + String(chip) + "]");
 					Serial.println("");
 			}
 }
 
 
+// Función para leer un byte de la memoria.
 byte leer1Byte(long dir, boolean mostrar){
 		start:
 			i2c_start();
 	    
-			i2c_esc_byte(0xA0); // chip 0 y seleccionamos escritura
-			if (i2c_Rbit() != 0) goto start; // si ACK devuelve 1 nadie respondio entncs al start otra vez
+			if (chip == 2){i2c_write_byte(0xA8);}  	// Se indica el chip a utilizar y modo escritura 
+			else {i2c_write_byte(0xA0);} 	
+			if (i2c_Rbit() != 0) goto start; 				// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
 	    
-			// Mandar la direccion en la que se va a leer
-			i2c_esc_byte(dir >> 8); // te quedas con los mas significativos y se mandan para el bus
-			if (i2c_Rbit() != 0) goto start; // si ACK devuelve 1 nadie respondio entncs al start otra vez
+
+			i2c_write_byte(dir >> 8); 					// Se envian los 8 bits más significativos bits de la dirección
+			if (i2c_Rbit() != 0) goto start; 				// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
 	    
-			i2c_esc_byte(dir & 0xFF); // te quedas con los menos significativos y se mandan para el bus
-			if (i2c_Rbit() != 0) goto start; // si ACK devuelve 1 nadie respondio entncs al start otra vez
+			i2c_write_byte(dir & 0xFF); 				// Se envian los 8 bits menos significativos bits de la dirección
+			if (i2c_Rbit() != 0) goto start; 				// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
 			
 			i2c_start();
 			
-			i2c_esc_byte(0xA1); // chip 0 y seleccionamos lectura
-			if (i2c_Rbit() != 0) goto start; // si ACK devuelve 1 nadie respondio entncs al start otra vez
+			if (chip == 2){i2c_write_byte(0xA9);}  	// Se indica el chip a utilizar y modo lectura 
+			else {i2c_write_byte(0xA1);} 	
+			if (i2c_Rbit() != 0) goto start; 				// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
 			
-			// Leemos el byte de la memoria 
-			byte datoLeido = i2c_lee_byte();
+			byte datoLeido = i2c_read_byte();		// Se lee el byte de la memoria 
 	
 			i2c_stop();
 
 			if (mostrar){
-					Serial.println("De la posición de memoria: " + String(dir) + " se ha leido el valor " + String(datoLeido) + " (HEX: "  + convertirAHexadecimal(datoLeido) + ")");
+					Serial.println("De la posición de memoria: " + String(dir) + " (HEX: "  + convertirAHexadecimal(dir)  + ")" + " se ha leido el valor " + String(datoLeido) + " (HEX: "  + convertirAHexadecimal(datoLeido) + ")" + " [Chip: " + String(chip) + "]");
 					Serial.println("");
 			}
 			return datoLeido;
 }  
 
 
+// Función para escribir un bloque de 256 bytes byte a byte
 long inicializarBloque(long dir, long dato){
 			long dirInicial = dir;
 			Serial.println("Escribiendo...");
@@ -340,12 +357,12 @@ long inicializarBloque(long dir, long dato){
 			}
 			
 			timeIB = millis() - timeIB;
-			Serial.println("Hecho! Se ha copiado en el bloque " + String(dirInicial) + "-" + String(dir-1) + " el valor " + String(dato) + " (HEX: "  + convertirAHexadecimal(dato) + ")");
+			Serial.println("Hecho! Se ha copiado en el bloque " + String(dirInicial) + "-" + String(dir) + " [(HEX: "  + convertirAHexadecimal(dirInicial) + ") - " + "(HEX: "  + convertirAHexadecimal(dir-1) + ")]" + " el valor " + String(dato) + " (HEX: "  + convertirAHexadecimal(dato) + ")" + " [Chip: " + String(chip) + "]");
 			return timeIB;
 }
 
 
-// Funcion para mostrar las columnas cuando se muestra el bloque
+// Funcion para mostrar las columnas cuando se visualiza el bloque
 void ponerCabecera(boolean decimal){
 			if (decimal){
 					Serial.println("         0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15");
@@ -358,7 +375,7 @@ void ponerCabecera(boolean decimal){
 }
 
 
-// Funcion para mostrar los indices a la hora de mostrar el bloque leido 
+// Funcion para mostrar los indices a la hora de visualizar el bloque leido 
 void ponerIndices(int indice){
 			if (indice % 16 != 0) return;
 			if (indice == 0) Serial.print(convertirADecimal(indice) + ")   ");
@@ -369,6 +386,7 @@ void ponerIndices(int indice){
 }
 
 
+// Función para leer un bloque de 256 bytes de la memoria byte a byte
 long leerBloque(long dir, boolean decimal){
 			byte datoLeido = 0;
 			long dirInicial = dir;
@@ -391,34 +409,36 @@ long leerBloque(long dir, boolean decimal){
 
 			timeLB = millis() - timeLB;
 			Serial.println("");
-			Serial.println("Hecho! Se ha mostrado el contenido del bloque " + String(dirInicial) + "-" + String(dir-1));
+			Serial.println("Hecho! Se ha mostrado el contenido del bloque " + String(dirInicial) + "-" + String(dir) + " [Chip: " + String(chip) + "]");
 			return timeLB;
 }
 
 
+// Función para escribir un bloque de 256 bytes en memoria utilizando 'Page write'
 void escribirPagina(long dir, long dato){
-
 		start:
 			i2c_start();
 	    
-			i2c_esc_byte(0xA0); // chip 0 y seleccionamos escritura
-			if (i2c_Rbit() != 0) goto start; // si ACK devuelve 1 nadie respondio entncs al start otra vez
+			if (chip == 2){i2c_write_byte(0xA8);}  	// Se indica el chip a utilizar y modo escritura 
+			else {i2c_write_byte(0xA0);} 	
+			if (i2c_Rbit() != 0) goto start; 				// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
 	    
-			// Mandar la direccion en la que se va a escribir
-			i2c_esc_byte(dir >> 8); // te quedas con los mas significativos y se mandan para el bus
-			if (i2c_Rbit() != 0) goto start; // si ACK devuelve 1 nadie respondio entncs al start otra vez
+
+			i2c_write_byte(dir >> 8); 					// Se envian los 8 bits más significativos bits de la dirección
+			if (i2c_Rbit() != 0) goto start; 				// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
 	    
-			i2c_esc_byte(dir & 0xFF); // te quedas con los menos significativos y se mandan para el bus
-			if (i2c_Rbit() != 0) goto start; // si ACK devuelve 1 nadie respondio entncs al start otra vez
+			i2c_write_byte(dir & 0xFF); 				// Se envian los 8 bits menos significativos bits de la dirección
+			if (i2c_Rbit() != 0) goto start; 				// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
 
 			for (int i=0;i<32;i++){
-					i2c_esc_byte(dato); // chip 0 y seleccionamos lectura
-					if (i2c_Rbit() != 0) goto start; // si ACK devuelve 1 nadie respondio entncs al start otra vez 
+					i2c_write_byte(dato); 					// Se escribe el dato en la dirección 
+					if (i2c_Rbit() != 0) goto start; 		// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
 			}
 			i2c_stop();
 }
 
 
+// Funcion que inicializa un bloque de 256 bytes de la memoria a un valor
 long inicializarBloquePageWrite(long dir, long dato){
 			long dirInicial = dir;
 
@@ -434,7 +454,7 @@ long inicializarBloquePageWrite(long dir, long dato){
 			
 			timeIBPR = millis() - timeIBPR;
 
-			Serial.println("Hecho! Se ha copiado en el bloque " + String(dirInicial) + "-" + String(dir) + " el valor " + String(dato) + " (HEX: "  + convertirAHexadecimal(dato) + ")");
+			Serial.println("Hecho! Se ha copiado en el bloque " + String(dirInicial) + "-" + String(dir-1) + " el valor " + String(dato) + " (HEX: "  + convertirAHexadecimal(dato) + ")" + " [Chip: " + String(chip) + "]");
 			return timeIBPR;
 }
 
@@ -472,53 +492,54 @@ void mostrarArray(byte array[], boolean decimal, long rango){
 }
 
 
-long calcularMinimo(long numeroLecturas){
-		if (numeroLecturas > 256) return 256;
-		return numeroLecturas;
+// Función para calcular el número de lecturas que debe hacer.
+long calcularMinimo(long dir){
+		long lecturas = 8191 - dir;
+		if (lecturas > 256) return 256;
+		return lecturas;
 }
 
 
 long leerBloqueSecuencial(long dir, boolean decimal){			
-
-		start:
 			long numeroLecturas = 256;
-			numeroLecturas  = calcularMinimo(8191 - dir);
+			numeroLecturas  = calcularMinimo(dir);
 			byte bloqueLeido[256];
-		
-			unsigned long timeLBS = millis();
 
+			Serial.println("Leyendo...");
+			Serial.println("");			
+		start:
+			unsigned long timeLBS = millis();
+			
 			i2c_start();
 	    
-			i2c_esc_byte(0xA0); // chip 0 y seleccionamos escritura
-			if (i2c_Rbit() != 0) goto start; // si ACK devuelve 1 nadie respondio entncs al start otra vez
+			if (chip == 2){i2c_write_byte(0xA8);}  	// Se indica el chip a utilizar y modo escritura 
+			else {i2c_write_byte(0xA0);} 	
+			if (i2c_Rbit() != 0) goto start; 				// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
 	    
-			// Mandar la direccion en la que se va a leer
-			i2c_esc_byte(dir >> 8); // te quedas con los mas significativos y se mandan para el bus
-			if (i2c_Rbit() != 0) goto start; // si ACK devuelve 1 nadie respondio entncs al start otra vez
+			i2c_write_byte(dir >> 8); 					// Se envian los 8 bits más significativos bits de la dirección
+			if (i2c_Rbit() != 0) goto start; 				// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
 	    
-			i2c_esc_byte(dir & 0xFF); // te quedas con los menos significativos y se mandan para el bus
-			if (i2c_Rbit() != 0) goto start; // si ACK devuelve 1 nadie respondio entncs al start otra vez
+			i2c_write_byte(dir & 0xFF); 				// Se envian los 8 bits menos significativos bits de la dirección
+			if (i2c_Rbit() != 0) goto start; 				// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
 			
 			i2c_start();
 			
-			i2c_esc_byte(0xA1); // chip 0 y seleccionamos lectura
-			if (i2c_Rbit() != 0) goto start; // si ACK devuelve 1 nadie respondio entncs al start otra vez						
+			if (chip == 2){i2c_write_byte(0xA9);}  	// Se indica el chip a utilizar y modo lectura 
+			else {i2c_write_byte(0xA1);} 	
+			if (i2c_Rbit() != 0) goto start; 				// si ACK devuelve 1 nadie ha respondido y se vuelve a realizar el proceso
 
 			for (int i=0;i<numeroLecturas;i++){
-					bloqueLeido[i] = i2c_lee_byte();
-					i2c_Ebit0();
+					bloqueLeido[i] = i2c_read_byte();
+					i2c_Ebit0();									// See envia un ACK para seguir leyendo bytes
 			}
-			i2c_Ebit1();
+			i2c_Ebit1();											// Cuando se leen los 256 bytes se manda un NO ACK para no leer más
 			i2c_stop();
 
 			timeLBS = millis() - timeLBS;
-			Serial.println("Leyendo...");
-			Serial.println("");	
 			ponerCabecera(decimal);
 			mostrarArray(bloqueLeido, decimal, numeroLecturas);
 			
 			Serial.println("");
-			Serial.println("Hecho! Se ha mostrado el contenido del bloque " + String(dir) + "-" + String(dir+numeroLecturas));
+			Serial.println("Hecho! Se ha mostrado el contenido del bloque " + String(dir) + "-" + String(dir+numeroLecturas) + " [Chip: " + String(chip) + "]");
 			return timeLBS;
 }
-
